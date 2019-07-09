@@ -1,0 +1,10 @@
+sample	condition	fq1
+axi1	P1	data/axi_1.fq
+axi2	P1	data/axi_2.fq
+axi3	P1	data/axi_2.fq
+f1-1	F1	data/f1_1.fq
+f1-2	F1	data/f1_2.fq
+f1-3	F1	data/f1_3.fq
+inf1	P2	data/inf_1.fq
+inf2	P2	data/inf_2.fq
+inf3	P2	data/inf_3.fq
