@@ -10,11 +10,11 @@ RESULT_DIR = config["result_dir"]
 
 # fetch URL to transcriptome multi fasta from configfile
 genome_P1_url = config["refs"]["genome_P1"]
-transcriptome_P1_url= config["refs"]["transcriptome_P1_gtf"]
-
+transcriptome_P1_url_gtf= config["refs"]["transcriptome_P1_gtf"]
+transcriptome_P1_fasta_url= config["refs"]["transcriptome_P1_fasta"]
 genome_P2_url = config["refs"]["genome_P2"]
-transcriptome_P2_url= config["refs"]["transcriptome_P2_gtf"]
-
+transcriptome_P2_gtf_url= config["refs"]["transcriptome_P2_gtf"]
+transcriptome_P2_gtf_url= config["refs"]["transcriptome_P2_fasta"]
 
 ########################
 # Samples and conditions
