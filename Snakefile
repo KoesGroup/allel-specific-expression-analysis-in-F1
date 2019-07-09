@@ -61,6 +61,7 @@ def get_trimmed(wildcards):
 #################
 # Desired outputs
 #################
+
 rule all:
     input:
         WORKING_DIR + "genome/merged.fasta"'
@@ -74,6 +75,7 @@ rule all:
         #RESULT_DIR + "counts_merged_P2.txt"
     message:
         "Job done! Removing temporary directory"
+
 
 #######
 # Rules
@@ -95,6 +97,7 @@ rule get_genome_fastas:
     shell:
         "wget -O {output.P1} {genome_P1_url}; wget -O {output.P2} {genome_P2_url}"
 
+
 rule get_transcriptome_gtfs:
     output:
         P1 = WORKING_DIR + "genome/transcriptomeP1.gff",
@@ -106,6 +109,7 @@ rule get_transcriptome_gtfs:
     shell:
         "wget -O {output.P1} {transcriptome_P1_url}; get -O {output.P2} {transcriptome_P2_url}"
 
+
 rule get_protein_fastas:
     output:
         P1 = WORKING_DIR + "genome/proteomeP1.fasta",
@@ -116,6 +120,7 @@ rule get_protein_fastas:
         "envs/wget.yaml"
     shell:
         "wget -O {output.P1} {proteome_P1_gtf_url}; get -O {output.P2} {proteome_P2_gtf_url}"
+
 
 rule merge_genomes:
     input:
@@ -136,7 +141,6 @@ To get the homologous genes from both perantal lines, blast will be done in to w
 If the in a blast two genes hit each other in both directions it is presumed a "homologous gene couple"
 """
 
-
 # create transcriptome index, for blasting
 rule get_transcriptome_P1_index:
     input:
@@ -148,6 +152,7 @@ rule get_transcriptome_P1_index:
     shell:
         "makeblastdb -in {input} -dbtype prot"
 
+
 rule get_transcriptome_P2_index:
     input:
         WORKING_DIR + "genome/proteomeP2.fasta"
@@ -157,6 +162,7 @@ rule get_transcriptome_P2_index:
         "envs/blast.yaml"
     shell:
         "makeblastdb -in {input} -dbtype prot"
+
 
 # Do the blasts
 rule blast_P1_to_P2:
@@ -183,6 +189,7 @@ rule blast_P1_to_P2:
         "-out {output} "
         "-num_threads {threads} "
         "-max_target_seqs {params.maxTargets}"
+
 
 rule blast_P2_to_P1:
     input:
@@ -267,6 +274,7 @@ rule star_index_P1:
         "--genomeFastaFiles {input} "
         "--runThreadN {threads} "
         "--limitGenomeGenerateRAM 100000000000"
+
 
 rule star_mapping_P1:
     input:
@@ -363,6 +371,7 @@ rule star_index_merged:
         "--genomeFastaFiles {input} "
         "--runThreadN {threads} "
         "--limitGenomeGenerateRAM 200000000000"
+
 
 rule star_mapping_merged:
     input:
