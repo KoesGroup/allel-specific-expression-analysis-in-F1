@@ -63,8 +63,15 @@ def get_trimmed(wildcards):
 #################
 rule all:
     input:
-
-
+        WORKING_DIR + "genome/merged.fasta"'
+        #[WORKING_DIR + "genome/proteomeP1.fasta." + i for i in ("psq", "phr", "pin")]
+        #[WORKING_DIR + "genome/proteomeP2.fasta." + i for i in ("psq", "phr", "pin")]
+        #WORKING_DIR + "results/P2_to_P1_blast.txt"
+        #WORKING_DIR + "results/P1_to_P2_blast.txt"
+        #RESULT_DIR + "counts_P1.txt",
+        #RESULT_DIR + "counts_P2.txt",
+        #RESULT_DIR + "counts_merged_P1.txt",
+        #RESULT_DIR + "counts_merged_P2.txt"
     message:
         "Job done! Removing temporary directory"
 
@@ -124,6 +131,12 @@ rule merge_genomes:
 #  Blast transcriptomes to get homologous gene couples between both parental lines
 ##################################################################################
 
+""" 
+To get the homologous genes from both perantal lines, blast will be done in to ways (P1 -> P2 and P2 -> P1)
+If the in a blast two genes hit each other in both directions it is presumed a "homologous gene couple"
+"""
+
+
 # create transcriptome index, for blasting
 rule get_transcriptome_P1_index:
     input:
@@ -148,9 +161,9 @@ rule get_transcriptome_P2_index:
 # Do the blasts
 rule blast_P1_to_P2:
     input:
-        newTct     = WORKING_DIR + "genome/transcriptome_P1.fasta",
-        refTct     = WORKING_DIR + "genome/transcriptome_P2.fasta",
-        indexFiles = [WORKING_DIR + "genome/transcriptome_P2.fasta." + i for i in ("psq", "phr", "pin")]
+        P1 = WORKING_DIR + "genome/proteomeP1.fasta",
+        P2 = WORKING_DIR + "genome/proteomeP2.fasta",
+        indexFiles = [WORKING_DIR + "genome/proteomeP2.fasta." + i for i in ("psq", "phr", "pin")]
     output:
         WORKING_DIR + "results/P1_to_P2_blast.txt"
     params:
@@ -163,8 +176,8 @@ rule blast_P1_to_P2:
         "envs/blast.yaml"
     shell:
         "blastx "
-        "-query {input.newTct} "
-        "-db {input.refTct} "
+        "-query {input.P1} "
+        "-db {input.P2} "
         "-outfmt \"{params.outFmt}\" "
         "-evalue {params.evalue} "
         "-out {output} "
@@ -173,9 +186,9 @@ rule blast_P1_to_P2:
 
 rule blast_P2_to_P1:
     input:
-        newTct     = WORKING_DIR + "genome/transcriptome_P2.fasta",
-        refTct     = WORKING_DIR + "genome/transcriptome_P1.fasta",
-        indexFiles = [WORKING_DIR + "genome/transcriptome_P1.fasta." + i for i in ("psq", "phr", "pin")]
+        P1 = WORKING_DIR + "genome/proteomeP1.fasta",
+        P2 = WORKING_DIR + "genome/proteomeP2.fasta",
+        indexFiles = [WORKING_DIR + "genome/proteomeP1.fasta." + i for i in ("psq", "phr", "pin")]
     output:
         WORKING_DIR + "results/P2_to_P1_blast.txt"
     params:
@@ -188,8 +201,8 @@ rule blast_P2_to_P1:
         "envs/blast.yaml"
     shell:
         "blastx "
-        "-query {input.newTct} "
-        "-db {input.refTct} "
+        "-query {input.P2} "
+        "-db {input.P1} "
         "-outfmt \"{params.outFmt}\" "
         "-evalue {params.evalue} "
         "-out {output} "
@@ -197,10 +210,9 @@ rule blast_P2_to_P1:
         "-max_target_seqs {params.maxTargets}"
 
 
-
-##################################
-# Fastp
-##################################
+#######################################
+# Fastp (quality controle and trimmimg)
+#######################################
 
 rule fastp:
     input:
@@ -235,135 +247,149 @@ rule fastp:
 # RNA-Seq read alignement to parental genomes, accepting multiple missmatches and with softclipping
 ###################################################################################################
 
-
-
-# If you pass one file, STAR will consider these as single-end reads: --readFilesIn single_reads.fastq.
-
-# If you pass two files, STAR will consider these as paired reads: --readFilesIn pair_1.fastq pair_2.fastq.
-
-
-
-rule star_index_p1:
+rule star_index_P1:
     input:
-        WORKING_DIR + "genome/genome_P1.fasta"
+        WORKING_DIR + "genome/genomeP1.fasta"
     output:
-        [WORKING_DIR + "genome/genome_P1." + str(i) + ".ht2" for i in range(1,9)]
+        WORKING_DIR + "genome/genomeP1/SAindex"
     message:
         "indexing genome"
     params:
-        WORKING_DIR + "genome/genome"
+        dir    = WORKING_DIR + "genome/genomeP1",
+        prefix = "genomeP1"
+    conda:
+        "envs/star.yaml"
     threads: 10
     shell:
-        "hisat2-build -p {threads} {input} {params} --quiet"
+        "STAR --runMode genomeGenerate "
+        "--genomeDir {params.dir} "
+        "--outFileNamePrefix {params.prefix} " 
+        "--genomeFastaFiles {input} "
+        "--runThreadN {threads} "
+        "--limitGenomeGenerateRAM 100000000000"
 
 rule star_mapping_P1:
     input:
-        get_trimmed,
-        indexFiles = [WORKING_DIR + "genome/genome." + str(i) + ".ht2" for i in range(1,9)]
+        fq         = get_trimmed,
+        WORKING_DIR + "genome/genomeP1/SAindex"
     output:
-        bams  = WORKING_DIR + "mapped/{sample}.bam",
-        sum   = RESULT_DIR + "logs/{sample}_sum.txt",
-        met   = RESULT_DIR + "logs/{sample}_met.txt"
+        WORKING_DIR + "mapped/{sample}.bam"
     params:
-        indexName = WORKING_DIR + "genome/genome",
+        indexName = WORKING_DIR + "genome/genomeP1",
         sampleName = "{sample}"
-    # conda:
-    #     "envs/hisat_mapping.yaml"
+    conda:
+        "envs/star.yaml"
     message:
         "mapping reads to genome to bam files."
     threads: 10
-    run:
-        if sample_is_single_end(params.sampleName):
-            shell("hisat2 -p {threads} --summary-file {output.sum} --met-file {output.met} -x {params.indexName} \
-            -U {input} | samtools view -Sb -F 4 -o {output.bams}")
-        else:
-            shell("hisat2 -p {threads} --summary-file {output.sum} --met-file {output.met} -x {params.indexName} \
-            -1 {input[0]} -2 {input[1]} | samtools view -Sb -F 4 -o {output.bams}")
-
-
+    shell:
+    	"STAR --genomeDir {params.indexName} "
+        "--runThreadN {threads} "
+        "--readFilesIn {fq} "
+        "--readFilesCommand zcat "
+        "--outFileNamePrefix {params.sampleName} "
+        "--outSAMtype BAM SortedByCoordinate "
+        "--outSAMunmapped None "
+        "--outSAMattributes Standard"
 
 
 rule star_index_p2:
     input:
-        WORKING_DIR + "genome/genome_P2.fasta"
+        WORKING_DIR + "genome/genomeP2.fasta"
     output:
-        [WORKING_DIR + "genome/genome_P2." + str(i) + ".ht2" for i in range(1,9)]
+        WORKING_DIR + "genome/genomeP2/SAindex"
     message:
         "indexing genome"
     params:
-        WORKING_DIR + "genome/genome"
+        dir    = WORKING_DIR + "genome/genomeP2",
+        prefix = "genomeP2"
+    conda:
+        "envs/star.yaml"
     threads: 10
     shell:
-        "hisat2-build -p {threads} {input} {params} --quiet"
+        "STAR --runMode genomeGenerate "
+        "--genomeDir {params.dir} "
+        "--outFileNamePrefix {params.prefix} " 
+        "--genomeFastaFiles {input} "
+        "--runThreadN {threads} "
+        "--limitGenomeGenerateRAM 100000000000"
+
 
 rule star_mapping_P2:
     input:
-        get_trimmed,
-        indexFiles = [WORKING_DIR + "genome/genome." + str(i) + ".ht2" for i in range(1,9)]
+        fq    = get_trimmed,
+        index = WORKING_DIR + "genome/genomeP2/SAindex"
     output:
-        bams  = WORKING_DIR + "mapped/{sample}.bam",
-        sum   = RESULT_DIR + "logs/{sample}_sum.txt",
-        met   = RESULT_DIR + "logs/{sample}_met.txt"
+        WORKING_DIR + "mapped/{sample}.bam"
     params:
         indexName = WORKING_DIR + "genome/genome",
         sampleName = "{sample}"
-    # conda:
-    #     "envs/hisat_mapping.yaml"
+    conda:
+        "envs/star.yaml"
     message:
         "mapping reads to genome to bam files."
     threads: 10
-    run:
-        if sample_is_single_end(params.sampleName):
-            shell("hisat2 -p {threads} --summary-file {output.sum} --met-file {output.met} -x {params.indexName} \
-            -U {input} | samtools view -Sb -F 4 -o {output.bams}")
-        else:
-            shell("hisat2 -p {threads} --summary-file {output.sum} --met-file {output.met} -x {params.indexName} \
-            -1 {input[0]} -2 {input[1]} | samtools view -Sb -F 4 -o {output.bams}")
-
+    shell:
+    	"STAR --genomeDir {params.indexName} "
+        "--runThreadN {threads} "
+        "--readFilesIn {fq} "
+        "--readFilesCommand zcat "
+        "--outFileNamePrefix {params.sampleName} "
+        "--outSAMtype BAM SortedByCoordinate "
+        "--outSAMunmapped None "
+        "--outSAMattributes Standard"
 
 
 #######################################################################################
 # RNA-Seq read alignement to merged genome, accepting no mismatches and no softclipping
 #######################################################################################
 
-
 rule star_index_merged:
     input:
         WORKING_DIR + "genome/merged.fasta"
     output:
-        [WORKING_DIR + "genome/merged." + str(i) + ".ht2" for i in range(1,9)]
+         WORKING_DIR + "genome/merged/SAindex"
     message:
         "indexing genome"
     params:
-        WORKING_DIR + "genome/genome"
+        dir    = WORKING_DIR + "genome/merged",
+        prefix = "merged"
+    conda:
+        "envs/star.yaml"
     threads: 10
     shell:
-        "hisat2-build -p {threads} {input} {params} --quiet"
-
+        "STAR --runMode genomeGenerate --genomeDir {params.dir} "
+        "--outFileNamePrefix {params.prefix} " 
+        "--genomeFastaFiles {input} "
+        "--runThreadN {threads} "
+        "--limitGenomeGenerateRAM 200000000000"
 
 rule star_mapping_merged:
     input:
         get_trimmed,
-        indexFiles = [WORKING_DIR + "genome/genome." + str(i) + ".ht2" for i in range(1,9)]
+        indexFiles = WORKING_DIR + "genome/merged/SAindex"
     output:
-        bams  = WORKING_DIR + "mapped/{sample}.bam",
-        sum   = RESULT_DIR + "logs/{sample}_sum.txt",
-        met   = RESULT_DIR + "logs/{sample}_met.txt"
+        bams  = WORKING_DIR + "mapped/{sample}.bam"
     params:
-        indexName = WORKING_DIR + "genome/genome",
+        indexName = WORKING_DIR + "genome/merged",
         sampleName = "{sample}"
-    # conda:
-    #     "envs/hisat_mapping.yaml"
+    conda:
+        "envs/star.yaml"
     message:
         "mapping reads to genome to bam files."
     threads: 10
-    run:
-        if sample_is_single_end(params.sampleName):
-            shell("hisat2 -p {threads} --summary-file {output.sum} --met-file {output.met} -x {params.indexName} \
-            -U {input} | samtools view -Sb -F 4 -o {output.bams}")
-        else:
-            shell("hisat2 -p {threads} --summary-file {output.sum} --met-file {output.met} -x {params.indexName} \
-            -1 {input[0]} -2 {input[1]} | samtools view -Sb -F 4 -o {output.bams}")
+    shell:
+    	"STAR --genomeDir {params.indexName} "
+        "--runThreadN {threads} "
+        "--readFilesIn {fq} "
+        "--readFilesCommand zcat "
+        "--outFileNamePrefix {params.sampleName} "
+        "--outSAMtype BAM SortedByCoordinate "
+        "--outSAMunmapped None "
+        "--outSAMattributes Standard "
+        "--outFilterMismatchNmax 0 "
+        "--alignEndsType EndToEnd "
+        "--outFilterMultimapNmax 1"
 
 
 ############################
@@ -404,7 +430,6 @@ rule create_counts_table_merged_P1:
         "envs/subread.yaml"
     shell:
         "featureCounts -O -t mRNA -g ID -F 'gtf' -a {input.gff} -o {output} {input.bams}"
-
 
 
 rule create_counts_table_merged_P2:
