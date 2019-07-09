@@ -11,10 +11,10 @@ RESULT_DIR = config["result_dir"]
 # fetch URL to transcriptome multi fasta from configfile
 genome_P1_url = config["refs"]["genome_P1"]
 transcriptome_P1_url_gtf= config["refs"]["transcriptome_P1_gtf"]
-transcriptome_P1_fasta_url= config["refs"]["transcriptome_P1_fasta"]
+proteome_P1_fasta_url= config["refs"]["proteins_P1"]
 genome_P2_url = config["refs"]["genome_P2"]
 transcriptome_P2_gtf_url= config["refs"]["transcriptome_P2_gtf"]
-transcriptome_P2_gtf_url= config["refs"]["transcriptome_P2_fasta"]
+proteome_P2_gtf_url= config["refs"]["proteins_P2"]
 
 ########################
 # Samples and conditions
@@ -77,52 +77,45 @@ rule all:
 # Download references
 #####################
 
-rule get_genome_P1_fasta:
+rule get_genome_fastas:
     output:
-        WORKING_DIR + "genome/genomeP1.fasta"
+        P1 = WORKING_DIR + "genome/genomeP1.fasta",
+        P2 = WORKING_DIR + "genome/genomeP2.fasta"
     message:
         "downloading the required genomic fasta file"
     conda:
         "envs/wget.yaml"
     shell:
-        "wget -O {output} {genome_P1_url}"
+        "wget -O {output.P1} {genome_P1_url}; wget -O {output.P2} {genome_P2_url}"
 
-rule get_transcriptome_P2_gtf:
+rule get_transcriptome_gtfs:
     output:
-        WORKING_DIR + "genome/transcriptomeP1.gff"
+        P1 = WORKING_DIR + "genome/transcriptomeP1.gff",
+        P2 = WORKING_DIR + "genome/transcriptomeP2.gff"
     message:
         "downloading required transcriptome gtf file"
     conda:
         "envs/wget.yaml"
     shell:
-        "wget -O {output} {transcriptome_P1_url}"
+        "wget -O {output.P1} {transcriptome_P1_url}; get -O {output.P2} {transcriptome_P2_url}"
 
-rule get_genome_P1_fasta:
+rule get_protein_fastas:
     output:
-        WORKING_DIR + "genome/genomeP2.fasta"
+        P1 = WORKING_DIR + "genome/proteomeP1.fasta",
+        P2 = WORKING_DIR + "genome/proteomeP2.fasta"
     message:
-        "downloading the required genomic fasta file"
+        "downloading required proteome fasta file"
     conda:
         "envs/wget.yaml"
     shell:
-        "wget -O {output} {genome_P2_url}"
-
-rule get_transcriptome_P2_gtf:
-    output:
-        WORKING_DIR + "genome/transcriptome_P2.gff"
-    message:
-        "downloading required transcriptome gtf file"
-    conda:
-        "envs/wget.yaml"
-    shell:
-        "wget -O {output} {transcriptome_P2_url}"
+        "wget -O {output.P1} {proteome_P1_gtf_url}; get -O {output.P2} {proteome_P2_gtf_url}"
 
 rule merge_genomes:
     input:
         P1  = WORKING_DIR + "genome/genomeP1.fasta"
         P2  = WORKING_DIR + "genome/genomeP2.fasta"
     output:
-        WORKING_DIR + "genome/total.fasta"
+        WORKING_DIR + "genome/merged.fasta"
     shell:
         "cat {input.P1} {input.P2} > {output}"
 
@@ -134,9 +127,9 @@ rule merge_genomes:
 # create transcriptome index, for blasting
 rule get_transcriptome_P1_index:
     input:
-        WORKING_DIR + "genome/transcriptome_P1.fasta"
+        WORKING_DIR + "genome/proteomeP1.fasta"
     output:
-        [WORKING_DIR + "genome/transcriptome_P1.fasta." + i for i in ("psq", "phr", "pin")]
+        [WORKING_DIR + "genome/proteomeP1.fasta." + i for i in ("psq", "phr", "pin")]
     conda:
         "envs/blast.yaml"
     shell:
@@ -144,9 +137,9 @@ rule get_transcriptome_P1_index:
 
 rule get_transcriptome_P2_index:
     input:
-        WORKING_DIR + "genome/transcriptome_P2.fasta"
+        WORKING_DIR + "genome/proteomeP2.fasta"
     output:
-        [WORKING_DIR + "genome/transcriptome_P2.fasta." + i for i in ("psq", "phr", "pin")]
+        [WORKING_DIR + "genome/proteomeP2.fasta." + i for i in ("psq", "phr", "pin")]
     conda:
         "envs/blast.yaml"
     shell:
@@ -329,11 +322,16 @@ rule star_mapping_P2:
 
 
 
+#######################################################################################
+# RNA-Seq read alignement to merged genome, accepting no mismatches and no softclipping
+#######################################################################################
+
+
 rule star_index_merged:
     input:
-        WORKING_DIR + "genome/total.fasta"
+        WORKING_DIR + "genome/merged.fasta"
     output:
-        [WORKING_DIR + "genome/total." + str(i) + ".ht2" for i in range(1,9)]
+        [WORKING_DIR + "genome/merged." + str(i) + ".ht2" for i in range(1,9)]
     message:
         "indexing genome"
     params:
@@ -341,10 +339,6 @@ rule star_index_merged:
     threads: 10
     shell:
         "hisat2-build -p {threads} {input} {params} --quiet"
-
-
-
-
 
 
 rule star_mapping_merged:
@@ -372,7 +366,9 @@ rule star_mapping_merged:
             -1 {input[0]} -2 {input[1]} | samtools view -Sb -F 4 -o {output.bams}")
 
 
-
+############################
+## create raw counts tables.
+############################
 
 rule create_counts_table_P1:
     input:
