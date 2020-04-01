@@ -107,7 +107,7 @@ rule get_transcriptome_gtfs:
     conda:
         "envs/wget.yaml"
     shell:
-        "wget -O {output.P1} {transcriptome_P1_url}; get -O {output.P2} {transcriptome_P2_url}"
+        "wget -O {output.P1} {transcriptome_P1_url}; wget -O {output.P2} {transcriptome_P2_url}"
 
 
 rule get_protein_fastas:
@@ -119,7 +119,7 @@ rule get_protein_fastas:
     conda:
         "envs/wget.yaml"
     shell:
-        "wget -O {output.P1} {proteome_P1_gtf_url}; get -O {output.P2} {proteome_P2_gtf_url}"
+        "wget -O {output.P1} {proteome_P1_gtf_url}; wget -O {output.P2} {proteome_P2_gtf_url}"
 
 
 rule merge_genomes:
