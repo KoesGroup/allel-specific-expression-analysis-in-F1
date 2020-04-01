@@ -293,7 +293,7 @@ rule star_mapping_P1:
     shell:
     	"STAR --genomeDir {params.indexName} "
         "--runThreadN {threads} "
-        "--readFilesIn {fq} "
+        "--readFilesIn {input.fq} "
         "--readFilesCommand zcat "
         "--outFileNamePrefix {params.sampleName} "
         "--outSAMtype BAM SortedByCoordinate "
@@ -340,7 +340,7 @@ rule star_mapping_P2:
     shell:
     	"STAR --genomeDir {params.indexName} "
         "--runThreadN {threads} "
-        "--readFilesIn {fq} "
+        "--readFilesIn {input.fq} "
         "--readFilesCommand zcat "
         "--outFileNamePrefix {params.sampleName} "
         "--outSAMtype BAM SortedByCoordinate "
